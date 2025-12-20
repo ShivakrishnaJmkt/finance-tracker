@@ -1,7 +1,7 @@
 // App.jsx - పూర్తి corrected code
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, doc, query } from 'firebase/firestore';
-import { db } from './firebase';  // auth import remove చేశాను
+import { collection, onSnapshot, doc, query, setDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import {
   BrowserRouter,
   Routes,
@@ -26,23 +26,17 @@ const MONTHS = [
 export default function App() {
   const { user, logout } = useAuth();
 
-  // Profile image - Cloudinary (localStorage OK)
+  // Profile image
   const [profileImg, setProfileImg] = useState("/my-profile.jpg");
-  useEffect(() => {
-    const saved = localStorage.getItem("profileImg");
-    if (saved) setProfileImg(saved);
-  }, []);
-  useEffect(() => {
-    localStorage.setItem("profileImg", profileImg);
-  }, [profileImg]);
 
-  // 🔥 Data states (Firestore)
+  // Firestore data states
   const [excelBills, setExcelBills] = useState([]);
   const [excelMonthly, setExcelMonthly] = useState([]);
   const [upiSpends, setUpiSpends] = useState([]);
   const [upiBudgets, setUpiBudgets] = useState({});
+  const [segmentMonthly, setSegmentMonthly] = useState({});
 
-  // 🔥 AUTH ROUTES (not logged in)
+  // AUTH ROUTES (not logged in)
   if (!user) {
     return (
       <BrowserRouter>
@@ -55,14 +49,16 @@ export default function App() {
     );
   }
 
-  // 🔥 FIRESTORE REAL-TIME SYNC (సరైన useEffect)
+  // 🔥 FIRESTORE REAL-TIME SYNC (read)
   useEffect(() => {
     if (!user?.uid) return;
 
     // Excel Bills
     const billsRef = query(collection(db, `users/${user.uid}/bills`));
     const unsubBills = onSnapshot(billsRef, (snap) => {
-      setExcelBills(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      console.log("Bills from Firestore:", data);
+      setExcelBills(data);
     });
 
     // Excel Monthly
@@ -77,27 +73,87 @@ export default function App() {
       setUpiSpends(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // UPI Budgets (single document)
+    // UPI Budgets
     const budgetRef = doc(db, `users/${user.uid}/budgets/budget`);
     const unsubBudget = onSnapshot(budgetRef, (snap) => {
       if (snap.exists()) setUpiBudgets(snap.data());
     });
 
-    // Cleanup
+    // SEGMENTS (TracksPage)
+    const segRef = query(collection(db, `users/${user.uid}/segments`));
+    const unsubSeg = onSnapshot(segRef, (snap) => {
+      console.log("Segments from Firestore:", snap.docs.map(d => d.data()));
+      const obj = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (data.month) {
+          obj[data.month] = {
+            Rent: data.Rent || 0,
+            Kirana: data.Kirana || 0,
+            Petrol: data.Petrol || 0,
+            "Online Bills": data["Online Bills"] || 0,
+          };
+        }
+      });
+      setSegmentMonthly(obj);
+    });
+
+    // PROFILE IMAGE
+    const profileRef = doc(db, `users/${user.uid}/profile/img`);
+    const unsubProfile = onSnapshot(profileRef, (snap) => {
+      if (snap.exists()) {
+        setProfileImg(snap.data().url || "/my-profile.jpg");
+      }
+    });
+
     return () => {
       unsubBills();
       unsubMonthly();
       unsubUpi();
       unsubBudget();
+      unsubSeg();
+      unsubProfile();
     };
   }, [user?.uid]);
 
-  // 🔥 ALL localStorage useEffects REMOVED
+  // 🔥 SEGMENTS WRITE EFFECT (TracksPage → Firestore)
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!segmentMonthly || Object.keys(segmentMonthly).length === 0) return;
+
+
+     console.log("Saving segments to Firestore:", segmentMonthly);
+    const save = async () => {
+      const userRef = doc(db, `users/${user.uid}`);
+      const promises = Object.entries(segmentMonthly).map(
+        async ([month, data]) => {
+          // skip completely empty months (optional)
+          const hasValue = ["Rent","Kirana","Petrol","Online Bills"]
+            .some(k => Number(data[k] || 0) !== 0);
+          if (!hasValue) return;
+
+          await setDoc(doc(userRef, "segments", month), {
+            month,
+            Rent: data.Rent || 0,
+            Kirana: data.Kirana || 0,
+            Petrol: data.Petrol || 0,
+            "Online Bills": data["Online Bills"] || 0,
+            updatedAt: new Date(),
+          });
+        }
+      );
+      await Promise.all(promises);
+
+      console.log("Segments saved!");
+    };
+
+    save().catch(console.error);
+  }, [segmentMonthly, user?.uid]);
 
   return (
     <BrowserRouter>
       <div className="min-h-screen flex bg-black text-white">
-        {/* LEFT SIDEBAR - SAME */}
+        {/* LEFT SIDEBAR */}
         <aside className="w-64 bg-zinc-950 border-r border-zinc-800 p-6 flex flex-col">
           <div className="flex flex-col items-center mb-8">
             <img
@@ -125,7 +181,7 @@ export default function App() {
           </nav>
         </aside>
 
-        {/* RIGHT CONTENT - SAME props */}
+        {/* RIGHT CONTENT */}
         <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
           <Routes>
             <Route
@@ -154,7 +210,15 @@ export default function App() {
                 />
               }
             />
-            <Route path="/tracks" element={<TracksPage />} />
+            <Route
+              path="/tracks"
+              element={
+                <TracksPage
+                  segmentMonthly={segmentMonthly}
+                  setSegmentMonthly={setSegmentMonthly}
+                />
+              }
+            />
             <Route path="/debts" element={<DebtPage />} />
             <Route path="*" element={<Navigate to="/cards" replace />} />
           </Routes>
