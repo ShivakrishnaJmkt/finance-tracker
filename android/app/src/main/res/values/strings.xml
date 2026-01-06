@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Credix</string>
+    <string name="title_activity_main">givefreely</string>
+    <string name="package_name">com.shivakrishnajmkt.give freely</string>
+    <string name="custom_url_scheme">com.shivakrishnajmkt.givefreely</string>
+</resources>

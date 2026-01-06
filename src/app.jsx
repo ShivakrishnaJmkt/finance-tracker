@@ -1,7 +1,7 @@
-// App.jsx - పూర్తి corrected code
+// App.jsx
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, doc, query, setDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { collection, onSnapshot, doc, query, setDoc } from "firebase/firestore";
+import { db } from "./firebase";
 import {
   BrowserRouter,
   Routes,
@@ -26,17 +26,14 @@ const MONTHS = [
 export default function App() {
   const { user, logout } = useAuth();
 
-  // Profile image
   const [profileImg, setProfileImg] = useState("/my-profile.jpg");
 
-  // Firestore data states
   const [excelBills, setExcelBills] = useState([]);
   const [excelMonthly, setExcelMonthly] = useState([]);
   const [upiSpends, setUpiSpends] = useState([]);
   const [upiBudgets, setUpiBudgets] = useState({});
   const [segmentMonthly, setSegmentMonthly] = useState({});
 
-  // AUTH ROUTES (not logged in)
   if (!user) {
     return (
       <BrowserRouter>
@@ -49,42 +46,34 @@ export default function App() {
     );
   }
 
-  // 🔥 FIRESTORE REAL-TIME SYNC (read)
   useEffect(() => {
     if (!user?.uid) return;
 
-    // Excel Bills
     const billsRef = query(collection(db, `users/${user.uid}/bills`));
     const unsubBills = onSnapshot(billsRef, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("Bills from Firestore:", data);
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setExcelBills(data);
     });
 
-    // Excel Monthly
     const monthlyRef = query(collection(db, `users/${user.uid}/monthly`));
     const unsubMonthly = onSnapshot(monthlyRef, (snap) => {
-      setExcelMonthly(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setExcelMonthly(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
-    // UPI Spends
     const upiRef = query(collection(db, `users/${user.uid}/upiSpends`));
     const unsubUpi = onSnapshot(upiRef, (snap) => {
-      setUpiSpends(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setUpiSpends(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
-    // UPI Budgets
     const budgetRef = doc(db, `users/${user.uid}/budgets/budget`);
     const unsubBudget = onSnapshot(budgetRef, (snap) => {
       if (snap.exists()) setUpiBudgets(snap.data());
     });
 
-    // SEGMENTS (TracksPage)
     const segRef = query(collection(db, `users/${user.uid}/segments`));
     const unsubSeg = onSnapshot(segRef, (snap) => {
-      console.log("Segments from Firestore:", snap.docs.map(d => d.data()));
       const obj = {};
-      snap.docs.forEach(d => {
+      snap.docs.forEach((d) => {
         const data = d.data();
         if (data.month) {
           obj[data.month] = {
@@ -98,7 +87,6 @@ export default function App() {
       setSegmentMonthly(obj);
     });
 
-    // PROFILE IMAGE
     const profileRef = doc(db, `users/${user.uid}/profile/img`);
     const unsubProfile = onSnapshot(profileRef, (snap) => {
       if (snap.exists()) {
@@ -116,20 +104,17 @@ export default function App() {
     };
   }, [user?.uid]);
 
-  // 🔥 SEGMENTS WRITE EFFECT (TracksPage → Firestore)
   useEffect(() => {
     if (!user?.uid) return;
     if (!segmentMonthly || Object.keys(segmentMonthly).length === 0) return;
 
-
-     console.log("Saving segments to Firestore:", segmentMonthly);
     const save = async () => {
       const userRef = doc(db, `users/${user.uid}`);
       const promises = Object.entries(segmentMonthly).map(
         async ([month, data]) => {
-          // skip completely empty months (optional)
-          const hasValue = ["Rent","Kirana","Petrol","Online Bills"]
-            .some(k => Number(data[k] || 0) !== 0);
+          const hasValue = ["Rent", "Kirana", "Petrol", "Online Bills"].some(
+            (k) => Number(data[k] || 0) !== 0
+          );
           if (!hasValue) return;
 
           await setDoc(doc(userRef, "segments", month), {
@@ -143,8 +128,6 @@ export default function App() {
         }
       );
       await Promise.all(promises);
-
-      console.log("Segments saved!");
     };
 
     save().catch(console.error);
@@ -152,28 +135,52 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen flex bg-black text-white">
-        {/* LEFT SIDEBAR */}
-        <aside className="w-64 bg-zinc-950 border-r border-zinc-800 p-6 flex flex-col">
-          <div className="flex flex-col items-center mb-8">
+      {/* whole app */}
+      <div className="min-h-screen flex flex-col md:flex-row bg-black text-white">
+        {/* TOP BAR for mobile (md:hidden) */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-950">
+          <div className="flex items-center gap-3">
             <img
               src={profileImg}
               alt="Profile"
-              className="w-16 h-16 rounded-full object-cover mb-3"
+              className="w-9 h-9 rounded-full object-cover"
             />
-            <div className="text-sm font-semibold">
+            <div>
+              <div className="text-xs font-semibold">
+                {user.email || "User"}
+              </div>
+              <div className="text-[10px] text-zinc-400">{user.email}</div>
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            className="px-3 py-1 text-[11px] rounded border border-zinc-600 hover:bg-zinc-800"
+          >
+            Sign Out
+          </button>
+        </div>
+
+        {/* SIDEBAR – full only from md up */}
+        <aside className="hidden md:flex w-56 lg:w-64 bg-zinc-950 border-r border-zinc-800 p-4 lg:p-6 flex-col">
+          <div className="flex flex-col items-center mb-6 lg:mb-8 text-xs lg:text-sm">
+            <img
+              src={profileImg}
+              alt="Profile"
+              className="w-14 h-14 lg:w-16 lg:h-16 rounded-full object-cover mb-2 lg:mb-3"
+            />
+            <div className="font-semibold">
               {user.email || "User"}
             </div>
-            <div className="text-xs text-zinc-400 mb-1">{user.email}</div>
+            <div className="text-[11px] text-zinc-400 mb-1">{user.email}</div>
             <ProfileImageUploader onUploaded={(url) => setProfileImg(url)} />
             <button
               onClick={logout}
-              className="mt-3 px-3 py-1 text-xs rounded border border-zinc-600 hover:bg-zinc-800"
+              className="mt-3 px-3 py-1 text-[11px] rounded border border-zinc-600 hover:bg-zinc-800"
             >
               Sign Out
             </button>
           </div>
-          <nav className="space-y-1 text-sm">
+          <nav className="space-y-1 text-xs lg:text-sm">
             <NavItem to="/cards" label="Credit Cards" />
             <NavItem to="/monthly" label="Monthly Expenditure" />
             <NavItem to="/tracks" label="Tracks" />
@@ -181,8 +188,16 @@ export default function App() {
           </nav>
         </aside>
 
-        {/* RIGHT CONTENT */}
-        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
+        {/* MOBILE NAV ROW (below top bar) */}
+        <nav className="md:hidden flex justify-around border-b border-zinc-800 bg-zinc-950 text-[11px]">
+          <NavItem to="/cards" label="Cards" />
+          <NavItem to="/monthly" label="Monthly" />
+          <NavItem to="/tracks" label="Tracks" />
+          <NavItem to="/debts" label="Debt" />
+        </nav>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 overflow-y-auto px-3 md:px-6 lg:px-8 py-4 md:py-6">
           <Routes>
             <Route
               path="/cards"
@@ -233,7 +248,7 @@ function NavItem({ to, label }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `flex items-center gap-2 px-3 py-2 rounded ${
+        `flex items-center justify-center gap-2 px-3 py-2 rounded ${
           isActive
             ? "bg-purple-700 text-white"
             : "text-zinc-300 hover:bg-zinc-900"
