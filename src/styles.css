@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.dashboard-container {
+  padding: 24px;
+}
+
+.card {
+  margin-bottom: 16px;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.section-title {
+  margin: 24px 0 12px;
+}

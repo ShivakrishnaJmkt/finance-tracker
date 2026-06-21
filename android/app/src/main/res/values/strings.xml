@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Credix</string>
+    <string name="title_activity_main">Credix</string>
+    <string name="package_name">com.shivakrishnajmkt.credix</string>
+    <string name="custom_url_scheme">com.shivakrishnajmkt.credix</string>
+</resources>
