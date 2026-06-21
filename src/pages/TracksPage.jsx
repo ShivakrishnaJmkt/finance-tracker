@@ -159,7 +159,7 @@ export default function TracksPage() {
 
   const averageMeta = useMemo(() => {
     const now = new Date();
-    const currentMonthNumber = now.getMonth() + 1;
+    const currentMonthNumber = now.getMonth();
 
     const monthsToDivide =
       Number(selectedYear) === now.getFullYear() ? currentMonthNumber : 12;
